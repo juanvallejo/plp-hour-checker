@@ -31,8 +31,11 @@
  	</script>
  	<style>
 		.hidden {
-  			display:none;
-  		}
+			display:none;
+		}
+		#stats1Out {
+			z-index: 3;
+		}
 	</style>
 </head>
 <body>
@@ -187,11 +190,43 @@ $(uploadLogo).on('click', function(e) {
 	document.form.excel.click();
 });
 
+// Enable drag to upload if available
+if (window.File && window.FileList && window.FileReader) {
+	var filedrag = $("#stats1Out");
+	var xhr = new XMLHttpRequest();
+	if (xhr.upload) {
+		filedrag.on('drop', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			doUpload(e.originalEvent.dataTransfer.files);
+		});
+		filedrag.on('dragenter', function (e) {
+			e.stopPropagation();
+			e.preventDefault();
+			statsOutProgress.set(1);
+		});
+		filedrag.on('dragover', function (e) {
+			e.stopPropagation();
+			e.preventDefault();
+		});
+		filedrag.on('dragleave', function (e) {
+			e.stopPropagation();
+		  e.preventDefault();
+			statsOutProgress.reset();
+		});
+	}
+}
+
+// Enable file chooser upload
 $(document.form.excel).on('change', function() {
+	doUpload(document.form.excel.files);
+});
+
+function doUpload(files) {
 
 	animation.reset();
 
-	if(!document.form.excel.files.length) {
+	if(!files.length) {
 		return;
 	}
 
@@ -200,7 +235,7 @@ $(document.form.excel).on('change', function() {
 	sidInput.innerHTML = 'Uploading...';
 
 	var formData = new FormData();
-	formData.append('excel', document.form.excel.files[0]);
+	formData.append('excel', files[0]);
 
 	var xhr = new XMLHttpRequest();
 	xhr.open('POST', '/upload', true);
@@ -245,7 +280,7 @@ $(document.form.excel).on('change', function() {
 		}
 	});
 
-});
+}
 
 function handleServerResponse(response, callback) {
 
