@@ -11,10 +11,13 @@
 	<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
 	<script src="/socket.io/socket.io.js"></script>
 	<script>
-		var server_port = window.location.hostname == 'localhost' ? '' : 8443;
-		console.log(server_port);
+		var server_addr = 'https://plp-rubyserverapps.rhcloud.com:8443';
 
-	  	var server = io.connect(window.location.href + server_port);
+		if(window.location.hostname == 'localhost') {
+			server_addr = window.location.href;
+		}
+
+	  	var server = io.connect(server_addr);
 	  	var client_id = null;
 	  	
 	  	server.on('id', function(data) {
