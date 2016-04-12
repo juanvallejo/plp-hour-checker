@@ -62,7 +62,7 @@ a {
 		width: 100%;
 	}
 		.nav-bar-logo {
-			background: transparent url(/https://drive.google.com/uc?export=download&id=0Bxe1aH3lWDbtYlhVVHpmMFpqaWM) no-repeat center center;
+			background: transparent url(https://drive.google.com/uc?export=download&id=0Bxe1aH3lWDbtYlhVVHpmMFpqaWM) no-repeat center center;
 			background-size: auto 35%;
 			display: inline-block;
 			height: 100%;
@@ -406,7 +406,7 @@ font:200 0.8em 'Helvetica Neue', 'Roboto', 'Arial'; color:rgba(255,255,255,0.4);
 }
 
 	.stats .stats-out {
-		background-image: url(/logo.png);
+		background-image: url(https://drive.google.com/uc?export=download&id=0Bxe1aH3lWDbtYlhVVHpmMFpqaWM);
 		background-position: center center;
 		background-repeat: no-repeat;
 		background-size: 80% 80%;
