@@ -230,7 +230,7 @@ function showResults(data) {
 		var content = 'Welcome <b>' + (data.name || '') + '</b>,<br />';
 		content += 'You have completed a total of <b>' + data.hours.year + '</b> hours this year.<br />';
 		content += 'This semester alone, you have completed <b>' + data.hours.semester + '</b> hours.<br /><br />';
-		content += 'You have completed a total of <b>' + data.hours.total + '</b> during your time in the PLP program.';
+		content += 'You have completed a total of <b>' + data.hours.total + '</b> hours during your time in the PLP program.';
 
 		$('#results-panel').fadeIn();
 		$('#results-content').html(content);
