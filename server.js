@@ -1,5 +1,19 @@
 #!/usr/bin/env node
 
+/**
+* Provided under the MIT License (c) 2014
+* See LICENSE @file for details.
+*
+* @file server.js
+*
+* @author juanvallejo
+* @date 4/12/16
+*
+* Scanner application 'server'. Handles all data processing and i/o.
+* Reads data from a local mysql database, builds an internal structure
+* with it, and allows for easy manipulation of it. Outputs to .xlsx file.
+*/
+
 // define runtime consts
 var SERVER_HOST             = process.env.OPENSHIFT_NODEJS_IP   || '127.0.0.1';
 var SERVER_PORT             = process.env.OPENSHIFT_NODEJS_PORT || 8000;
@@ -10,6 +24,22 @@ var io   = require('socket.io');
 
 var Multiparty = require('multiparty');
 var Jsdom     = require('node-jsdom');
+
+var typeDefs = {
+    'css'   : 'text/css'                ,
+    'csv'   : 'text/csv'                ,
+    'html'  : 'text/html'               ,
+    'ico'   : 'image/x-icon'            ,
+    'jpg'   : 'image/jpeg'              ,
+    'jpeg'  : 'image/jpeg'              ,
+    'js'    : 'application/javascript'  ,
+    'map'   : 'application/x-navimap'   ,
+    'pdf'   : 'application/pdf'         ,
+    'png'   : 'image/png'               ,
+    'ttf'   : 'application/octet-stream',
+    'txt'   : 'text/plain'              ,
+    'woff'  : 'application/x-font-woff'
+}
 
 var app = http.createServer(function(req, res) {
 
@@ -35,29 +65,29 @@ var app = http.createServer(function(req, res) {
             if(err) {
                 console.log('Content type =', req.headers);
                 console.log('ERR MULTIPARTY', err);
-                return res.end('An error occurred while uploading your file, please try again.');
+                return res.end('err_upload');
             }
 
             if(!files.excel) {
                 console.log('Unexpected fileformname from client.');
-                return res.end('Unexpected client filename. Please try again.');
+                return res.end('err_filename');
             }
 
             fs.readFile(files.excel[0].path, function(err, data) {
 
                 if(err) {
                     console.log('ERR MULTIPART', err);
-                    return res.end('Error parsing file');
+                    return res.end('err_parse');
                 }
 
                 var doc = data.toString().split('<body>');
                 if(!doc.length || !doc[1]) {
-                    return res.end('Invalid doc type');
+                    return res.end('err_doctype');
                 }
 
                 doc = doc[1].split('</body>')[0];
                 if(!doc) {
-                    return res.end('Invalid doc type');
+                    return res.end('err_doctype');
                 }
                 
                 parseDocData(doc, function(data) {
@@ -70,7 +100,20 @@ var app = http.createServer(function(req, res) {
 
     }
 
-    res.end('Error 404. The page you are looking for could not be found.');
+    fs.readFile(__dirname + req.url, function(err, data) {
+
+        if(err) {
+            res.writeHead(404);
+            return res.end('404. Page not found.');
+        }
+
+        var ext = req.url.split('.');
+        ext = ext[ext.length - 1];
+ 
+        res.writeHead(200, {'Content-Type': (typeDefs[ext] || 'text/plain')});
+        res.end(data);
+
+    });
 
 });
 
@@ -101,6 +144,7 @@ function parseDocData(html, callback) {
         var totalYearHourCount = 0;
         var beginYearDate = new Date('2015,8,18');
         var beginSemDate = new Date('2016,1,1');
+
         for(var i = 1; i < cols.length; i++) {
             var row = cols.item(i).getElementsByTagName('td');
             var dateString = row.item(14).innerHTML;
@@ -113,9 +157,11 @@ function parseDocData(html, callback) {
                 name: row.item(1).innerHTML,
                 date: rowDate
             });
+
             if(rowDate.getTime() >= beginYearDate.getTime()) {
                 totalYearHourCount += parseFloat(row.item(13).innerHTML);
             }
+
             if(rowDate.getTime() >= beginSemDate.getTime()) {
                 totalSemesterHourCount += parseFloat(row.item(13).innerHTML);
             }

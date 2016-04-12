@@ -1,27 +1,269 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-  <title>PLP Hour Calculator</title>
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-  	var server = io.connect(window.location.href);
-  	var client_id = null;
-  	
-  	server.on('id', function(data) {
-  		client_id = data.body;
-  		console.log('received client id');
-  	});
-
-  </script>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+	<title>PLP Hour Checker</title>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/css/font-awesome.css" />
+	<link rel="stylesheet" href="/reset.css"/>
+	<link rel="stylesheet" href="/styles.css"/>
+	<script src="/progressbar.min.js"></script>
+	<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<script>
+	  	var server = io.connect(window.location.href);
+	  	var client_id = null;
+	  	
+	  	server.on('id', function(data) {
+	  		client_id = data.body;
+	  		console.log('received client id');
+	  	});
+ 	</script>
+ 	<style>
+		.hidden {
+  			display:none;
+  		}
+	</style>
 </head>
 <body>
+	<div id="main-panel" class="panel">
+		<div class="fx-shadow-overlay"></div><!--#fx-shadow-overlay-->
+		<div class="wrapper">
+			<div id="brand">
+				<!-- <p class="logo">Scan Your ID</p>
+				<p class="tagline">Please scan your ID to continue</p> -->
+			</div><!--#brand-->
 
-	<form method="post" action="/upload" enctype="multipart/form-data">
+			<div class="stats" id="stats1">
+				<div class="stats-out" id="stats1Out"></div><!--.stats-out-->
+			</div><!--.circle-->
+
+			<div class="panel-content">
+				<div class="editor">
+					<div class="editor-wrapper">
+						<div class="editor-content Bloom-colorize">
+							<!-- <div id="sid"></div> -->
+							<h1 id="sid-input">Upload File</h1>
+						</div><!--.editor-content-->
+					</div><!--.editor-wrapper-->
+				</div><!--.editor-->
+			</div><!--.panel-content-->
+
+			<div id="out"><!-- Upload your excel file containing your total PLP hours by clicking above. -->Made for the PLP department</div>
+
+		</div><!--#home-page-->
+
+	</div><!--#main-panel-->
+
+	<div class="panel" id="results-panel">
+		<div class="nav-bar">
+			<div class="nav-bar-logo"></div>
+			<div class="nav-bar-text">PLP Hour Checker</div>
+			<div class="nav-bar-exit" id="close-button"><span class="fa fa-close fa-lg"></span></div>
+		</div><!--.nav-bar -->
+		<div class="wrapper">
+			<div class="panel-content">
+				<div class="editor">
+					<div class="editor-wrapper">
+						<div class="editor-content" id="results-content">
+							Loading, please wait....
+						</div><!--.editor-content-->
+					</div><!--.editor-wrapper-->
+				</div><!--.editor-->
+			</div><!--.panel-content-->
+		</div><!--.wrapper-->
+	</div><!--.panel-->
+	<div id="overlay"></div><!--#overlay-->
+	<form method="post" action="/upload" enctype="multipart/form-data" name="form" class="hidden">
 		<input type="file" name="excel" />
-		<input type="submit" />
 	</form>
 
+<script>
+
+// load progressbar
+var statsOutProgress = new ProgressBar.Circle('#stats1', {
+	color:'rgba(180,243,255,1.0)',
+	duration:1200,
+	easing:'easeIn',
+	strokeWidth:1,
+	trailColor:'rgba(255,255,255,0.05)'
+});
+
+statsOutProgress.set(0);
+
+var animation = {
+	from: {color: 'rgba(180,243,255,1.0)'},
+	to: {color: 'rgba(180,243,255,1.0)'},
+	duration: 800,
+	callbacks: [],
+	step: function(state, circle) {
+		circle.path.setAttribute('stroke', state.color);
+	},
+	refresh: function(percent, callback) {
+		statsOutProgress.animate(percent || 0, animation, function() {
+			if(typeof callback == 'function') {
+				callback.call();
+			}
+		});
+	},
+	reset: function() {
+		statsOutProgress.set(0);
+	}
+};
+
+var closeButton = document.getElementById('close-button');
+$(closeButton).on('click', function() {
+	hideResults();
+});
+
+var uploadLogo = document.getElementById('stats1'); 
+var uploadText = document.getElementById('sid-input');
+$(uploadText).on('click', function(e) {
+	console.log('click');
+	document.form.excel.click();
+});
+
+$(uploadLogo).on('click', function(e) {
+	document.form.excel.click();
+});
+
+$(document.form.excel).on('change', function() {
+
+	animation.reset();
+
+	if(!document.form.excel.files.length) {
+		return;
+	}
+
+	var formData = new FormData();
+	formData.append('excel', document.form.excel.files[0]);
+
+	var xhr = new XMLHttpRequest();
+	xhr.open('POST', '/upload', true);
+	xhr.setRequestHeader('enctype', 'multipart/form-data');
+	xhr.send(formData);
+
+	$(xhr).on('progress', function(byteStream) {
+		if(byteStream.lengthComputable && byteStream.loaded / byteStream.total < 1) {
+			animation.refresh(byteStream.loaded / byteStream.total);
+			console.log(byteStream.loaded / byteStream.total * 100);
+		}
+	});
+
+	$(xhr).on('load', function() {
+		document.form.excel.value = '';
+		animation.refresh(1, function() {
+			for(var i = 0; i < animation.callbacks.length; i++) {
+				animation.callbacks[i].call();
+			}
+			animation.callbacks = [];
+		});
+	});
+
+	$(xhr).on('error', function(err) {
+		console.log('An error ocurred uploading your file', err);
+		animation.to = {color: 'rgba(205,55,0, 1.0)'};
+	});
+
+	$(xhr).on('readystatechange', function() {
+		if(xhr.status == 200 && xhr.readyState == 4) {
+			handleServerResponse(xhr.responseText, function(err, data) {
+				
+				if(err) {
+					return showAlert(err);
+				}
+
+				animation.callbacks.push(function() {
+					showResults(data);
+				});
+
+			});
+		}
+	});
+
+});
+
+function handleServerResponse(response, callback) {
+
+	var err = null;
+	callback = callback || function() {};
+	animation.to = {color: 'rgba(205,55,0, 1.0)'};
+	
+	if(response == 'err_upload') {
+		err = 'An error occurred while uploading your file, please try again.';
+	}
+
+	if(response == 'err_filename') {
+		err = 'Unexpected client filename. Please try again.';
+	}
+
+	if(response == 'err_doctype') {
+		err = 'The file format you are trying to upload is not supported.';
+	}
+
+	if(response == 'err_parse') {
+		err = 'There was an error reading your file, please try again.';
+	}
+
+	if(err) {
+		return callback.call(this, err, null);
+	}
+
+	try {
+		animation.to = {color: 'rgba(180,243,255,1.0)'};
+		callback.call(this, null, JSON.parse(response));
+	} catch(e) {
+		callbac.call(this, e.toString(), null);
+	}
+
+}
+
+function showResults(data) {
+
+	$('#main-panel').fadeOut('normal', function() {
+		var content = 'Welcome <b>' + (data.name || '') + '</b>,<br />';
+		content += 'You have completed a total of <b>' + data.hours.year + '</b> hours this year.<br />';
+		content += 'This semester alone, you have completed <b>' + data.hours.semester + '</b> hours.<br /><br />';
+		content += 'You have completed a total of <b>' + data.hours.total + '</b> during your time in the PLP program.';
+
+		$('#results-panel').fadeIn();
+		$('#results-content').html(content);
+	});
+
+}
+
+function hideResults() {
+	$('#results-panel').fadeOut('normal', function() {
+		$('#main-panel').fadeIn();
+	});
+}
+
+// display alert message
+function showAlert(text) {
+
+	if(!showAlert.container) {
+
+		showAlert.container = document.createElement('div');
+		showAlert.container.className = 'alert-banner-top';
+
+		$(showAlert.container).on('click', function() {
+			clearTimeout(showAlert.container.timeout);
+			$(this).fadeOut();
+		});
+
+		document.body.appendChild(showAlert.container);
+	}
+
+	$(showAlert.container).fadeIn();
+	showAlert.container.innerHTML = text;
+
+	clearTimeout(showAlert.container.timeout);
+	showAlert.container.timeout = setTimeout(function() {
+		$(showAlert.container).fadeOut();
+	}, 100000);
+
+}
+
+</script>
 </body>
 </html>
