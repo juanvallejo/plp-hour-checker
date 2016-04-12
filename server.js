@@ -1,159 +1,145 @@
-#!/bin/env node
-//  OpenShift sample Node application
-var express = require('express');
-var fs      = require('fs');
+#!/usr/bin/env node
 
+// define runtime consts
+var SERVER_HOST             = process.env.OPENSHIFT_NODEJS_IP   || '127.0.0.1';
+var SERVER_PORT             = process.env.OPENSHIFT_NODEJS_PORT || 8000;
 
-/**
- *  Define the sample application.
- */
-var SampleApp = function() {
+var fs   = require('fs');
+var http = require('http');
+var io   = require('socket.io');
 
-    //  Scope.
-    var self = this;
+var Multiparty = require('multiparty');
+var Jsdom     = require('node-jsdom');
 
+var app = http.createServer(function(req, res) {
 
-    /*  ================================================================  */
-    /*  Helper functions.                                                 */
-    /*  ================================================================  */
+    if(req.url == '/' || req.url == '/index.html') {
+        return fs.readFile(__dirname + '/index.html', function(err, data) {
+            
+            if(err) {
+                console.log('Error reading requested path', req.url);
+                return res.end(data);
+            }
 
-    /**
-     *  Set up server IP address and port # using env variables/defaults.
-     */
-    self.setupVariables = function() {
-        //  Set the environment variables we need.
-        self.ipaddress = process.env.OPENSHIFT_NODEJS_IP;
-        self.port      = process.env.OPENSHIFT_NODEJS_PORT || 8080;
+            res.writeHead(200, {'Content-Type': 'text/html'});
+            res.end(data);
 
-        if (typeof self.ipaddress === "undefined") {
-            //  Log errors on OpenShift but continue w/ 127.0.0.1 - this
-            //  allows us to run/test the app locally.
-            console.warn('No OPENSHIFT_NODEJS_IP var, using 127.0.0.1');
-            self.ipaddress = "127.0.0.1";
-        };
-    };
-
-
-    /**
-     *  Populate the cache.
-     */
-    self.populateCache = function() {
-        if (typeof self.zcache === "undefined") {
-            self.zcache = { 'index.html': '' };
-        }
-
-        //  Local cache for static content.
-        self.zcache['index.html'] = fs.readFileSync('./index.html');
-    };
-
-
-    /**
-     *  Retrieve entry (content) from cache.
-     *  @param {string} key  Key identifying content to retrieve from cache.
-     */
-    self.cache_get = function(key) { return self.zcache[key]; };
-
-
-    /**
-     *  terminator === the termination handler
-     *  Terminate server on receipt of the specified signal.
-     *  @param {string} sig  Signal to terminate on.
-     */
-    self.terminator = function(sig){
-        if (typeof sig === "string") {
-           console.log('%s: Received %s - terminating sample app ...',
-                       Date(Date.now()), sig);
-           process.exit(1);
-        }
-        console.log('%s: Node server stopped.', Date(Date.now()) );
-    };
-
-
-    /**
-     *  Setup termination handlers (for exit and a list of signals).
-     */
-    self.setupTerminationHandlers = function(){
-        //  Process on exit and signals.
-        process.on('exit', function() { self.terminator(); });
-
-        // Removed 'SIGPIPE' from the list - bugz 852598.
-        ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGILL', 'SIGTRAP', 'SIGABRT',
-         'SIGBUS', 'SIGFPE', 'SIGUSR1', 'SIGSEGV', 'SIGUSR2', 'SIGTERM'
-        ].forEach(function(element, index, array) {
-            process.on(element, function() { self.terminator(element); });
         });
-    };
+    }
 
+    if(req.url == '/upload' && req.method == 'POST') {
+        
+        var form = new Multiparty.Form();
+        return form.parse(req, function(err, fields, files) {
 
-    /*  ================================================================  */
-    /*  App server functions (main app logic here).                       */
-    /*  ================================================================  */
+            if(err) {
+                console.log('Content type =', req.headers);
+                console.log('ERR MULTIPARTY', err);
+                return res.end('An error occurred while uploading your file, please try again.');
+            }
 
-    /**
-     *  Create the routing table entries + handlers for the application.
-     */
-    self.createRoutes = function() {
-        self.routes = { };
+            if(!files.excel) {
+                console.log('Unexpected fileformname from client.');
+                return res.end('Unexpected client filename. Please try again.');
+            }
 
-        self.routes['/asciimo'] = function(req, res) {
-            var link = "http://i.imgur.com/kmbjB.png";
-            res.send("<html><body><img src='" + link + "'></body></html>");
-        };
+            fs.readFile(files.excel[0].path, function(err, data) {
 
-        self.routes['/'] = function(req, res) {
-            res.setHeader('Content-Type', 'text/html');
-            res.send(self.cache_get('index.html') );
-        };
-    };
+                if(err) {
+                    console.log('ERR MULTIPART', err);
+                    return res.end('Error parsing file');
+                }
 
+                var doc = data.toString().split('<body>');
+                if(!doc.length || !doc[1]) {
+                    return res.end('Invalid doc type');
+                }
 
-    /**
-     *  Initialize the server (express) and create the routes and register
-     *  the handlers.
-     */
-    self.initializeServer = function() {
-        self.createRoutes();
-        self.app = express.createServer();
+                doc = doc[1].split('</body>')[0];
+                if(!doc) {
+                    return res.end('Invalid doc type');
+                }
+                
+                parseDocData(doc, function(data) {
+                    res.end(JSON.stringify(data));
+                });
 
-        //  Add handlers for the app (from the routes).
-        for (var r in self.routes) {
-            self.app.get(r, self.routes[r]);
-        }
-    };
+            });
 
-
-    /**
-     *  Initializes the sample application.
-     */
-    self.initialize = function() {
-        self.setupVariables();
-        self.populateCache();
-        self.setupTerminationHandlers();
-
-        // Create the express server and routes.
-        self.initializeServer();
-    };
-
-
-    /**
-     *  Start the server (starts up the sample application).
-     */
-    self.start = function() {
-        //  Start the app on the specific interface (and port).
-        self.app.listen(self.port, self.ipaddress, function() {
-            console.log('%s: Node server started on %s:%d ...',
-                        Date(Date.now() ), self.ipaddress, self.port);
         });
-    };
 
-};   /*  Sample Application.  */
+    }
 
+    res.end('Error 404. The page you are looking for could not be found.');
 
+});
 
-/**
- *  main():  Main code.
- */
-var zapp = new SampleApp();
-zapp.initialize();
-zapp.start();
+app.listen(SERVER_PORT, SERVER_HOST);
 
+io.listen(app).on('connection', function(client) {
+    console.log('Client', client.id, 'has connected.');
+
+    // emit id to client
+    client.emit('id', {body: client.id});
+});
+
+function parseDocData(html, callback) {
+
+    var response = {};
+
+    try {
+        
+        var document = Jsdom.jsdom(html);
+        var table = document.getElementsByTagName('table').item(0);
+        var cols = table.getElementsByTagName('tr');
+
+        var validCols = [];
+        var validCountCols = [];
+        var validRows = [];
+        var totalHourCount = 0;
+        var totalSemesterHourCount = 0;
+        var totalYearHourCount = 0;
+        var beginYearDate = new Date('2015,8,18');
+        var beginSemDate = new Date('2016,1,1');
+        for(var i = 1; i < cols.length; i++) {
+            var row = cols.item(i).getElementsByTagName('td');
+            var dateString = row.item(14).innerHTML;
+            var dateStringArr = dateString.split('/');
+            var rowDate = new Date(dateStringArr[2] + ',' + dateStringArr[1] + ',' + dateStringArr[0]);
+            totalHourCount += parseFloat(row.item(13).innerHTML);
+            validRows.push(cols.item(i));
+            validCountCols.push(cols.item(i).getElementsByTagName('td').item(13))
+            validCols.push({
+                name: row.item(1).innerHTML,
+                date: rowDate
+            });
+            if(rowDate.getTime() >= beginYearDate.getTime()) {
+                totalYearHourCount += parseFloat(row.item(13).innerHTML);
+            }
+            if(rowDate.getTime() >= beginSemDate.getTime()) {
+                totalSemesterHourCount += parseFloat(row.item(13).innerHTML);
+            }
+        }
+
+        response = {
+            error: false,
+            message: '',
+            name: (validCols[0].name || ''),
+            hours: {
+                semester: totalSemesterHourCount,
+                year: totalYearHourCount,
+                total: totalHourCount
+            }
+        };
+
+    } catch(e) {
+        console.log('JSDOM PARSE', e);
+        response = {
+            error: true,
+            message: e.toString()
+        }
+    }
+
+    callback.call(this, response);
+
+}
