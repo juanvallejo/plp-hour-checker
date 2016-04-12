@@ -19,7 +19,7 @@
 
 	  	var server = io.connect(server_addr);
 	  	var client_id = null;
-	  	
+
 	  	server.on('id', function(data) {
 	  		client_id = data.body;
 	  		console.log('received client id');
@@ -27,8 +27,11 @@
  	</script>
  	<style>
 		.hidden {
-  			display:none;
-  		}
+			display:none;
+		}
+		#stats1Out {
+			z-index: 3;
+		}
 	</style>
 </head>
 <body>
@@ -122,7 +125,7 @@ $(closeButton).on('click', function() {
 	hideResults();
 });
 
-var uploadLogo = document.getElementById('stats1'); 
+var uploadLogo = document.getElementById('stats1');
 var uploadText = document.getElementById('sid-input');
 $(uploadText).on('click', function(e) {
 	console.log('click');
@@ -133,16 +136,48 @@ $(uploadLogo).on('click', function(e) {
 	document.form.excel.click();
 });
 
+// Enable drag to upload if available
+if (window.File && window.FileList && window.FileReader) {
+	var filedrag = $("#stats1Out");
+	var xhr = new XMLHttpRequest();
+	if (xhr.upload) {
+		filedrag.on('drop', function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			doUpload(e.originalEvent.dataTransfer.files);
+		});
+		filedrag.on('dragenter', function (e) {
+			e.stopPropagation();
+			e.preventDefault();
+			statsOutProgress.set(1);
+		});
+		filedrag.on('dragover', function (e) {
+			e.stopPropagation();
+			e.preventDefault();
+		});
+		filedrag.on('dragleave', function (e) {
+			e.stopPropagation();
+		  e.preventDefault();
+			statsOutProgress.reset();
+		});
+	}
+}
+
+// Enable file chooser upload
 $(document.form.excel).on('change', function() {
+	doUpload(document.form.excel.files);
+});
+
+function doUpload(files) {
 
 	animation.reset();
 
-	if(!document.form.excel.files.length) {
+	if(!files.length) {
 		return;
 	}
 
 	var formData = new FormData();
-	formData.append('excel', document.form.excel.files[0]);
+	formData.append('excel', files[0]);
 
 	var xhr = new XMLHttpRequest();
 	xhr.open('POST', '/upload', true);
@@ -174,27 +209,28 @@ $(document.form.excel).on('change', function() {
 	$(xhr).on('readystatechange', function() {
 		if(xhr.status == 200 && xhr.readyState == 4) {
 			handleServerResponse(xhr.responseText, function(err, data) {
-				
+
 				if(err) {
 					return showAlert(err);
 				}
 
 				animation.callbacks.push(function() {
 					showResults(data);
+					animation.reset();
 				});
 
 			});
 		}
 	});
 
-});
+}
 
 function handleServerResponse(response, callback) {
 
 	var err = null;
 	callback = callback || function() {};
 	animation.to = {color: 'rgba(205,55,0, 1.0)'};
-	
+
 	if(response == 'err_upload') {
 		err = 'An error occurred while uploading your file, please try again.';
 	}
