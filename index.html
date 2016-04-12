@@ -7,6 +7,7 @@
 	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.4.0/css/font-awesome.css" />
 	<link rel="stylesheet" href="/reset.css"/>
 	<link rel="stylesheet" href="/styles.css"/>
+	<link rel="shortcut icon" href="/favicon.ico"/>
 	<script src="/progressbar.min.js"></script>
 	<script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
 	<script src="/socket.io/socket.io.js"></script>
@@ -98,23 +99,73 @@ var statsOutProgress = new ProgressBar.Circle('#stats1', {
 statsOutProgress.set(0);
 
 var animation = {
+
 	from: {color: 'rgba(180,243,255,1.0)'},
 	to: {color: 'rgba(180,243,255,1.0)'},
 	duration: 800,
-	callbacks: [],
+	callbacks: {},
+	has_finished: false,
+
 	step: function(state, circle) {
 		circle.path.setAttribute('stroke', state.color);
 	},
+
 	refresh: function(percent, callback) {
+
+		animation.has_finished = false;
 		statsOutProgress.animate(percent || 0, animation, function() {
+			animation.has_finished = true;
 			if(typeof callback == 'function') {
 				callback.call();
 			}
 		});
+
 	},
+
 	reset: function() {
 		statsOutProgress.set(0);
+	},
+
+	on: function(evt, callback, rm) {
+
+		if(!animation.callbacks[evt]) {
+			animation.callbacks[evt] = [];
+		}
+
+		callback.rm = rm || false;
+		animation.callbacks[evt].push(callback);
+
+	},
+
+	emit: function(evt, args) {
+		
+		if(!animation.callbacks[evt]) {
+			return;
+		}
+
+		if(!(args instanceof Array)) {
+			args = [args];
+		}
+
+		var idx_rm = [];
+
+		for(var i = 0; i < animation.callbacks[evt].length; i++) {
+			if(animation.callbacks[evt][i].rm) {
+				idx_rm.push(i);
+			}
+			animation.callbacks[evt][i].apply(this, args);
+		}
+		
+		if(!idx_rm.length) {
+			return;
+		}
+
+		for(var i = 0; i < idx_rm.length; i++) {
+			animation.callbacks[evt].splice(idx_rm[i], 1);
+		}
+
 	}
+	
 };
 
 var closeButton = document.getElementById('close-button');
@@ -159,10 +210,7 @@ $(document.form.excel).on('change', function() {
 	$(xhr).on('load', function() {
 		document.form.excel.value = '';
 		animation.refresh(1, function() {
-			for(var i = 0; i < animation.callbacks.length; i++) {
-				animation.callbacks[i].call();
-			}
-			animation.callbacks = [];
+			animation.emit('end');
 		});
 	});
 
@@ -179,9 +227,9 @@ $(document.form.excel).on('change', function() {
 					return showAlert(err);
 				}
 
-				animation.callbacks.push(function() {
+				animation.on('end', function() {
 					showResults(data);
-				});
+				}, true);
 
 			});
 		}
@@ -229,7 +277,7 @@ function showResults(data) {
 	$('#main-panel').fadeOut('normal', function() {
 		var content = 'Welcome <b>' + (data.name || '') + '</b>,<br />';
 		content += 'You have completed a total of <b>' + data.hours.year + '</b> hours this year.<br />';
-		content += 'This semester alone, you have completed <b>' + data.hours.semester + '</b> hours.<br /><br />';
+		content += 'This semester alone, you have submitted <b>' + data.hours.semester + '</b> hours.<br /><br />';
 		content += 'You have completed a total of <b>' + data.hours.total + '</b> hours during your time in the PLP program.';
 
 		$('#results-panel').fadeIn();
@@ -269,6 +317,16 @@ function showAlert(text) {
 	}, 100000);
 
 }
+
+</script>
+<script>
+	(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+	(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+	m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+	})(window,document,'script','https://www.google-analytics.com/analytics.js','ga');
+
+	ga('create', 'UA-62273783-3', 'auto');
+	ga('send', 'pageview');
 
 </script>
 </body>

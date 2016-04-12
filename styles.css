@@ -28,7 +28,7 @@ html,body {
 
 body {
 
-	background:black;
+	background: black url(bg.jpg);
 	/*background:rgb(4,13,20);*/
 	background-size:cover;
 	color:rgb(85,85,85);
@@ -278,7 +278,6 @@ a {
 
 #main-panel {
 	display: block;
-	background:rgba(0,0,0,0.53);
 	border-top:0;
 }
 
@@ -421,7 +420,8 @@ font:200 0.8em 'Helvetica Neue', 'Roboto', 'Arial'; color:rgba(255,255,255,0.4);
 	}
 
 .panel {
-	background:rgba(0,0,0,0.6);
+	background:rgba(0,0,0,0.7);
+	background-size: cover;
 	border-bottom:1px solid rgba(0,0,0,0.3);
 	border-top:1px solid rgba(255,255,255,0.07);
 	float:left;
