@@ -125,8 +125,8 @@ var animation = {
 
 	},
 
-	reset: function() {
-		statsOutProgress.set(0);
+	reset: function(progress) {
+		statsOutProgress.set(progress || 0);
 	},
 
 	on: function(evt, callback, rm) {
@@ -195,6 +195,10 @@ $(document.form.excel).on('change', function() {
 		return;
 	}
 
+	// set message
+	var sidInput = document.getElementById('sid-input');
+	sidInput.innerHTML = 'Uploading...';
+
 	var formData = new FormData();
 	formData.append('excel', document.form.excel.files[0]);
 
@@ -211,7 +215,7 @@ $(document.form.excel).on('change', function() {
 	});
 
 	$(xhr).on('load', function() {
-		document.form.excel.value = '';
+		animation.reset();
 		animation.refresh(1, function() {
 			animation.emit('end');
 		});
@@ -226,6 +230,9 @@ $(document.form.excel).on('change', function() {
 		if(xhr.status == 200 && xhr.readyState == 4) {
 			handleServerResponse(xhr.responseText, function(err, data) {
 				
+				document.form.excel.value = '';
+				sidInput.innerHTML = 'Upload File';
+
 				if(err) {
 					return showAlert(err);
 				}
